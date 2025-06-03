@@ -2,9 +2,9 @@ name: Security Analysis Scan
 
 on:
   push:
-    branches: [ "main", "develop", "next" ]
+    branches: [ "main", "master", "next" ]
   pull_request:
-    branches: [ "main", "develop", "next" ]
+    branches: [ "main", "master", "next" ]
   schedule:
     - cron: '38 15 * * 6'  # Her cumartesi çalışır
 
