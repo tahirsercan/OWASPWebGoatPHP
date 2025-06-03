@@ -1,0 +1,95 @@
+name: Security Analysis Scan
+
+on:
+  push:
+    branches: [ "main", "develop", "next" ]
+  pull_request:
+    branches: [ "main", "develop", "next" ]
+  schedule:
+    - cron: '38 15 * * 6'  # Her cumartesi çalışır
+
+jobs:
+  semgrep-scan:
+    name: Semgrep Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Semgrep
+        run: |
+          python -m pip install semgrep
+          semgrep --version
+
+      - name: Run Semgrep - SARIF
+        run: semgrep --config=p/php --sarif --output=semgrep-results.sarif .
+        continue-on-error: true
+
+      - name: Run Semgrep - JSON
+        run: semgrep --config=p/php --json --output=semgrep-results.json .
+        continue-on-error: true
+
+      - name: Convert Semgrep JSON to HTML
+        run: |
+          echo "<html><body><h1>Semgrep Report</h1><pre>$(cat semgrep-results.json | jq .)</pre></body></html>" > semgrep-report.html
+        continue-on-error: true
+
+      - name: Upload Semgrep SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-results.sarif
+        if: always()
+
+      - name: Upload Semgrep Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-reports
+          path: |
+            semgrep-results.sarif
+            semgrep-results.json
+            semgrep-report.html
+        if: always()
+
+  psalm-scan:
+    name: Psalm Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Psalm (SARIF Output)
+        uses: psalm/psalm-github-security-scan@f3e6fd9432bc3e44aec078572677ce9d2ef9c287
+        continue-on-error: true
+
+      - name: Run Psalm (JSON Output)
+        run: vendor/bin/psalm --output-format=json > psalm-results.json
+        continue-on-error: true
+
+      - name: Generate HTML Report from JSON
+        run: |
+          echo "<html><body><h1>Psalm Report</h1><pre>$(cat psalm-results.json | jq .)</pre></body></html>" > psalm-report.html
+        continue-on-error: true
+
+      - name: Upload Psalm SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+        if: always()
+
+      - name: Upload Psalm Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: psalm-reports
+          path: |
+            psalm-results.json
+            psalm-report.html
+            results.sarif
+        if: always()
