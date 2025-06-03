@@ -71,12 +71,14 @@ jobs:
           curl -L https://github.com/vimeo/psalm/releases/latest/download/psalm.phar -o psalm.phar
           chmod +x psalm.phar
   
-      - name: Run Psalm - SARIF
-        run: ./psalm.phar --output-format=sarif > results.sarif
+      - name: Run Psalm - SARIF (Debug)
+        run: |
+          ./psalm.phar --output-format=sarif --show-info=true . > results.sarif || (echo "Psalm failed" && cat results.sarif)
         continue-on-error: true
   
       - name: Run Psalm - JSON
-        run: ./psalm.phar --output-format=json > psalm-results.json
+        run: |
+          ./psalm.phar --output-format=json . > psalm-results.json || echo "Psalm JSON failed"
         continue-on-error: true
   
       - name: Generate HTML Report (Psalm)
@@ -99,3 +101,4 @@ jobs:
             psalm-results.json
             psalm-report.html
         if: always()
+  
