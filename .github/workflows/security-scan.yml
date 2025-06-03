@@ -61,37 +61,35 @@ jobs:
       contents: read
       security-events: write
       actions: read
-
+  
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install Composer Dependencies
+  
+      - name: Download Psalm PHAR
         run: |
-          composer install --no-progress --no-interaction
-
-      - name: Install Psalm
-        run: composer require --dev vimeo/psalm
-
+          curl -L https://github.com/vimeo/psalm/releases/latest/download/psalm.phar -o psalm.phar
+          chmod +x psalm.phar
+  
       - name: Run Psalm - SARIF
-        run: vendor/bin/psalm --output-format=sarif > results.sarif
+        run: ./psalm.phar --output-format=sarif > results.sarif
         continue-on-error: true
-
+  
       - name: Run Psalm - JSON
-        run: vendor/bin/psalm --output-format=json > psalm-results.json
+        run: ./psalm.phar --output-format=json > psalm-results.json
         continue-on-error: true
-
+  
       - name: Generate HTML Report (Psalm)
         run: |
           echo "<html><body><h1>Psalm Report</h1><pre>$(cat psalm-results.json | jq .)</pre></body></html>" > psalm-report.html
         continue-on-error: true
-
+  
       - name: Upload SARIF to GitHub (Psalm)
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif
         if: always()
-
+  
       - name: Upload Psalm Reports
         uses: actions/upload-artifact@v4
         with:
