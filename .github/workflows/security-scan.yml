@@ -1,104 +1,68 @@
-name: Security Scans
+name: Semgrep Security Scan
 
 on:
   push:
-    branches: [ "main", "master", "next" ]
+    branches: [ "main", "develop", "master" ]
   pull_request:
-    branches: [ "main", "master", "next" ]
-  schedule:
-    - cron: '38 15 * * 6'  # Haftalık Psalm taraması (isteğe bağlı)
+    branches: [ "main", "develop", "master" ]
 
 jobs:
   semgrep-scan:
-    name: Semgrep Scan
+    name: Run Semgrep Scan
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       security-events: write
+      contents: read
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install Semgrep
         run: |
           python -m pip install semgrep
           semgrep --version
 
-      - name: Run Semgrep - SARIF
-        run: semgrep --config=p/php --sarif --output=semgrep-results.sarif .
-        continue-on-error: true
-
-      - name: Run Semgrep - JSON
-        run: semgrep --config=p/php --json --output=semgrep-results.json .
-        continue-on-error: true
-
-      - name: Generate HTML Report (Semgrep)
+      # --- PHP Security Scan (p/php) ---
+      - name: Run Semgrep Scan (PHP, SARIF Output)
         run: |
-          echo "<html><body><h1>Semgrep Report</h1><pre>$(cat semgrep-results.json | jq .)</pre></body></html>" > semgrep-report.html
-        continue-on-error: true
+          semgrep --config=p/php --sarif --output=semgrep-php.sarif .
 
-      - name: Upload SARIF to GitHub (Semgrep)
+      - name: Run Semgrep Scan (PHP, JSON Output)
+        run: |
+          semgrep --config=p/php --json --output=semgrep-php.json .
+
+      # --- Secrets Scan (p/secrets) ---
+      - name: Run Semgrep Scan (Secrets, SARIF Output)
+        run: |
+          semgrep --config=p/secrets --sarif --output=semgrep-secrets.sarif .
+
+      - name: Run Semgrep Scan (Secrets, JSON Output)
+        run: |
+          semgrep --config=p/secrets --json --output=semgrep-secrets.json .
+
+      # --- Upload SARIF results to GitHub Code Scanning ---
+      - name: Upload PHP SARIF results
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: semgrep-results.sarif
+          sarif_file: semgrep-php.sarif
+          category: semgrep-php
         if: always()
 
-      - name: Upload Semgrep Reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: semgrep-reports
-          path: |
-            semgrep-results.sarif
-            semgrep-results.json
-            semgrep-report.html
-        if: always()
-
-  psalm-scan:
-    name: Psalm Scan
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-  
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-  
-      - name: Download Psalm PHAR
-        run: |
-          curl -L https://github.com/vimeo/psalm/releases/latest/download/psalm.phar -o psalm.phar
-          chmod +x psalm.phar
-  
-      - name: Run Psalm - SARIF (Debug)
-        run: |
-          ./psalm.phar --output-format=sarif --show-info=true . > results.sarif || (echo "Psalm failed" && cat results.sarif)
-        continue-on-error: true
-  
-      - name: Run Psalm - JSON
-        run: |
-          ./psalm.phar --output-format=json . > psalm-results.json || echo "Psalm JSON failed"
-        continue-on-error: true
-  
-      - name: Generate HTML Report (Psalm)
-        run: |
-          echo "<html><body><h1>Psalm Report</h1><pre>$(cat psalm-results.json | jq .)</pre></body></html>" > psalm-report.html
-        continue-on-error: true
-  
-      - name: Upload SARIF to GitHub (Psalm)
+      - name: Upload Secrets SARIF results
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: results.sarif
+          sarif_file: semgrep-secrets.sarif
+          category: semgrep-secrets
         if: always()
-  
-      - name: Upload Psalm Reports
+
+      # --- Upload all reports as artifact ---
+      - name: Upload Semgrep Reports as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: psalm-reports
+          name: semgrep-security-reports
           path: |
-            results.sarif
-            psalm-results.json
-            psalm-report.html
+            semgrep-php.sarif
+            semgrep-php.json
+            semgrep-secrets.sarif
+            semgrep-secrets.json
         if: always()
-  
